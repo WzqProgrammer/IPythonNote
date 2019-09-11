@@ -1,0 +1,7 @@
+实现jypyter notebook代码提示：
+  pip install jupyter_contrib_nbextensions
+  jupyter contrib nbextension install --user
+  
+ 设置主题、字体、颜色等样式：
+ pip install jupyterthemes
+ jt --lineh 140 -tf ptmono -t onedork -ofs 13 -nfs 14 -tfs 14 -fs 14 -T -N -dfs 10
