@@ -90,3 +90,64 @@ def load_data_fashion_mnist(mnist_train, mnist_test, batch_size):
     test_iter = torch.utils.data.DataLoader(
         mnist_test, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_iter, test_iter
+
+# softmax运算
+def softmax(X):
+    X_exp = X.exp()
+    partition = X_exp.sum(dim=1, keepdim=True)
+    return X_exp / partition   # 这里应用了广播机制
+
+
+# 交叉熵损失函数
+def cross_entropy(y_hat, y):
+    return - torch.log(y_hat.gather(1, y.view(-1, 1)))
+
+
+# 模型准确度评估函数
+def evaluate_accuracy(data_iter, net):
+    acc_sum, n = 0.0, 0
+    for X, y in data_iter:
+        acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
+        n += y.shape[0]
+    return acc_sum/n
+
+
+# 训练函数
+def train_ch3(net, train_iter, test_iter, loss, num_epochs, batch_size,
+             params=None, lr=None, optimizer=None):
+    for epoch in range(num_epochs):
+        train_l_sum, train_acc_sum, n = 0.0, 0.0, 0
+        
+        for X, y in train_iter:
+            y_hat = net(X)
+            l = loss(y_hat, y).sum()
+            
+            # 梯度清零
+            if optimizer is not None:
+                optimizer.zero_grad()
+            elif params is not None and params[0].grad is not None:
+                for param in params:
+                    param.grad.data.zero_()
+                    
+            l.backward()
+            if optimizer is None:
+                sgd(params, lr, batch_size)
+            else:
+                optimizer.step()   
+                
+            train_l_sum += l.item()
+            train_acc_sum += (y_hat.argmax(dim=1)==y).sum().item()
+            n += y.shape[0]
+            
+        test_acc = evaluate_accuracy(test_iter, net)
+        print("epoch %d, loss %.4f, train acc %.3f, test acc %.3f"
+             % (epoch+1, train_l_sum/n, train_acc_sum/n, test_acc))
+
+
+# x 的形状转换功能
+class FlattenLayer(nn.Module):
+    def __init__(self):
+        super(FlattenLayer, self).__init__()
+        
+    def forward(self, x):
+        return x.view(x.shape[0], -1)
