@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import sys
+from torch import nn
+from torch.nn import init
+import torchvision
+import torchvision.transforms as transforms
+
 
 def use_svg_display():
     # 用矢量图显示
@@ -74,7 +79,7 @@ def show_fashion_mnist(images, labels):
     plt.show()
 
 
-def load_data_fashion_mnist(mnist_train, mnist_test, batch_size):
+def load_data_fashion_mnist(batch_size):
     '''
     @description: 加载数据集   
     @param {type} 
@@ -85,11 +90,18 @@ def load_data_fashion_mnist(mnist_train, mnist_test, batch_size):
     else:
         num_workers = 4
 
+    mnist_train = torchvision.datasets.FashionMNIST(root='D:\CodeProjects\Datasets',
+                                               train=True, download=False, 
+                                               transform=transforms.ToTensor())
+    mnist_test = torchvision.datasets.FashionMNIST(root='D:\CodeProjects\Datasets',
+                                              train=False, download=False, 
+                                              transform=transforms.ToTensor())
     train_iter = torch.utils.data.DataLoader(
         mnist_train, batch_size=batch_size,shuffle=True, num_workers=num_workers)
     test_iter = torch.utils.data.DataLoader(
         mnist_test, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_iter, test_iter
+
 
 # softmax运算
 def softmax(X):
