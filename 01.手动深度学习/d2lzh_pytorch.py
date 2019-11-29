@@ -115,15 +115,6 @@ def cross_entropy(y_hat, y):
     return - torch.log(y_hat.gather(1, y.view(-1, 1)))
 
 
-# 模型准确度评估函数
-def evaluate_accuracy(data_iter, net):
-    acc_sum, n = 0.0, 0
-    for X, y in data_iter:
-        acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
-        n += y.shape[0]
-    return acc_sum/n
-
-
 # 训练函数
 def train_ch3(net, train_iter, test_iter, loss, num_epochs, batch_size,
              params=None, lr=None, optimizer=None):
@@ -175,3 +166,24 @@ def semilogy(x_vals, y_vals, x_label, y_label,
     if x2_vals and y2_vals:
         plt.semilogy(x2_vals, y2_vals, linestyle=':')
         plt.legend(legend)
+
+
+# 模型准确度评估
+def evaluate_accuracy(data_iter, net):
+    acc_sum, n = 0.0, 0
+    for X, y in data_iter:
+        # torch中定义的模型
+        if isinstance(net, nn.Module):
+            net.eval()   # 评估模式，会关闭丢弃层
+            acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
+            net.train()  # 改回训练模式
+        # 自定义的模型
+        else:
+            # 如果有is_training这个参数
+            if('is_training' in net.__code__.co_varnames):
+                # 将is_training设置成false
+                acc_sum += (net(X, is_training=False).argmax(dim=1) == y).float().sum().item()
+            else:
+                acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
+        n += y.shape[0]
+    return acc_sum / n
