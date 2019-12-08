@@ -11,6 +11,7 @@ from IPython import display
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import time
 import sys
 from torch import nn
 from torch.nn import init
@@ -147,6 +148,32 @@ def train_ch3(net, train_iter, test_iter, loss, num_epochs, batch_size,
              % (epoch+1, train_l_sum/n, train_acc_sum/n, test_acc))
 
 
+# 训练模型
+def train_ch5(net, train_iter, test_iter, batch_size,
+              optimizer, device, num_epochs):
+    net = net.to(device)
+    print("training on ", device)
+    loss = torch.nn.CrossEntropyLoss()
+    batch_count = 0
+    for epoch in range(num_epochs):
+        train_l_sum, train_acc_sum, n, start = 0.0, 0.0, 0, time.time()
+        for X, y in train_iter:
+            X = X.to(device)
+            y = y.to(device)
+            y_hat = net(X)
+            l = loss(y_hat, y)
+            optimizer.zero_grad()
+            l.backward()
+            optimizer.step()
+            train_l_sum += l.cpu().item()
+            train_acc_sum += (y_hat.argmax(dim=1) == y).sum().cpu().item()
+            n += y.shape[0]
+            batch_count += 1
+        test_acc = evaluate_accuracy(test_iter, net)
+        print("epoch %d, loss %.4f, train acc %.3f, test acc %.3f, time %.2f sec"%
+             (epoch + 1, train_l_sum / batch_count, train_acc_sum / n, test_acc, time.time()-start))
+
+
 # x 的形状转换功能
 class FlattenLayer(nn.Module):
     def __init__(self):
@@ -169,21 +196,35 @@ def semilogy(x_vals, y_vals, x_label, y_label,
 
 
 # 模型准确度评估
-def evaluate_accuracy(data_iter, net):
+def evaluate_accuracy(data_iter, net,
+ device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
     acc_sum, n = 0.0, 0
-    for X, y in data_iter:
-        # torch中定义的模型
-        if isinstance(net, nn.Module):
-            net.eval()   # 评估模式，会关闭丢弃层
-            acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
-            net.train()  # 改回训练模式
-        # 自定义的模型
-        else:
-            # 如果有is_training这个参数
-            if('is_training' in net.__code__.co_varnames):
-                # 将is_training设置成false
-                acc_sum += (net(X, is_training=False).argmax(dim=1) == y).float().sum().item()
+    with torch.no_grad():
+        for X, y in data_iter:
+            # torch中定义的模型
+            if isinstance(net, nn.Module):
+                net.eval()   # 评估模式，会关闭丢弃层
+                acc_sum += (net(X.to(device)).argmax(dim=1) == y.to(device)).float().sum().cpu().item()
+                net.train()  # 改回训练模式
+            # 自定义的模型
             else:
-                acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
-        n += y.shape[0]
+                # 如果有is_training这个参数
+                if('is_training' in net.__code__.co_varnames):
+                    # 将is_training设置成false
+                    acc_sum += (net(X, is_training=False).argmax(dim=1) == y).float().sum().item()
+                else:
+                    acc_sum += (net(X).argmax(dim=1) == y).float().sum().item()
+            n += y.shape[0]
     return acc_sum / n
+
+
+# 二维卷积运算
+def corr2d(X, K):
+    h, w = K.shape
+    Y = torch.zeros((X.shape[0] - h + 1, X.shape[1] - w + 1))
+
+    for i in range(Y.shape[0]):
+        for j in range(Y.shape[1]):
+            Y[i, j] = (X[i: i + h, j : j + w] * K).sum()
+            
+    return Y
