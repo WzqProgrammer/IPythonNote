@@ -11,10 +11,13 @@ from IPython import display
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import zipfile
 import time
 import sys
+import math
 from torch import nn
 from torch.nn import init
+import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 
@@ -80,27 +83,29 @@ def show_fashion_mnist(images, labels):
     plt.show()
 
 
-def load_data_fashion_mnist(batch_size):
-    '''
-    @description: 加载数据集   
-    @param {type} 
-    @return: train_iter, test_iter
-    '''
-    if sys.platform.startswith('win'):
-        num_workers = 0  # 0 表示不用额外的进程来加速读取速度
-    else:
-        num_workers = 4
-
-    mnist_train = torchvision.datasets.FashionMNIST(root='D:\CodeProjects\Datasets',
-                                               train=True, download=False, 
-                                               transform=transforms.ToTensor())
-    mnist_test = torchvision.datasets.FashionMNIST(root='D:\CodeProjects\Datasets',
-                                              train=False, download=False, 
-                                              transform=transforms.ToTensor())
-    train_iter = torch.utils.data.DataLoader(
-        mnist_train, batch_size=batch_size,shuffle=True, num_workers=num_workers)
-    test_iter = torch.utils.data.DataLoader(
-        mnist_test, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+def load_data_fashion_mnist(batch_size, resize=None,
+                            root='D:\CodeProjects/Datasets'):
+    """Download the fashion mnist dataset and then load into memory"""
+    trans = []
+    if resize:
+        trans.append(torchvision.transforms.Resize(size=resize))
+    trans.append(torchvision.transforms.ToTensor())
+    
+#     if sys.platform.startswith('win'):
+#         num_workers = 0  # 0 表示不用额外的进程来加速读取速度
+#     else:
+#         num_workers = 4
+        
+    transform = torchvision.transforms.Compose(trans)
+    mnist_train = torchvision.datasets.FashionMNIST(root=root, train=True,
+                                                   download=True, transform=transform)
+    mnist_test = torchvision.datasets.FashionMNIST(root=root, train=False,
+                                                  download=True, transform=transform)
+    
+    train_iter = torch.utils.data.DataLoader(mnist_train, batch_size=batch_size,
+                                            shuffle=True, num_workers=4)
+    test_iter = torch.utils.data.DataLoader(mnist_test, batch_size=batch_size,
+                                           shuffle=True, num_workers=4)
     return train_iter, test_iter
 
 
@@ -228,3 +233,29 @@ def corr2d(X, K):
             Y[i, j] = (X[i: i + h, j : j + w] * K).sum()
             
     return Y
+
+# 加载周杰伦歌词数据集
+def load_data_jay_lyrics():
+    with zipfile.ZipFile('Data/jaychou_lyrics.txt.zip') as zin:
+        with zin.open('jaychou_lyrics.txt') as f:
+            corpus_chars = f.read().decode('utf-8')
+    # 将换行符换成空格
+    corpus_chars = corpus_chars.replace('\n', ' ').replace('\r', ' ')
+
+    idx_to_char =list(set(corpus_chars))
+    char_to_idx = dict([(char, i) for i, char in enumerate(idx_to_char)])
+    vocab_size = len(char_to_idx)
+    corpus_indices = [char_to_idx[char] for char in corpus_chars]
+
+    return vocab_size, idx_to_char, char_to_idx, corpus_indices
+
+
+def one_hot(x, n_class, dtype=torch.float32):
+    x = x.long()
+    res = torch.zeros(x.shape[0], n_class, dtype=dtype, device=x.device)
+    res.scatter_(1, x.view(-1, 1), 1)
+    return res
+
+
+def to_onehot(X, n_class):
+    return [one_hot(X[:, i], n_class) for i in range(X.shape[1])]
